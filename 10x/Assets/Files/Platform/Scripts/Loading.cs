@@ -21,6 +21,8 @@ public class Loading : PersistentSingleton<Loading>
 
     private IEnumerator IELoadLevel(int scene, int extraTime, int param, Action<int> callBack)
     {
+        Debug.Log("======================= IE Load");
+
         AsyncOperation loadOperation = SceneManager.LoadSceneAsync(scene);
 
         float progress = 0;
@@ -75,6 +77,9 @@ public class Loading : PersistentSingleton<Loading>
 
     internal void LoadLevel(int scene, int extraTime, int param, Action<int> callBack)
     {
+        Debug.Log("======================= Load Level");
+        // Destroy(Init.instance.gameObject);
+
         StartCoroutine(IELoadLevel(scene, extraTime, param, callBack));
     }
 }

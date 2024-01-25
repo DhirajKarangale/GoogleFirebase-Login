@@ -9,11 +9,11 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Firebase.Extensions;
 
+
 public class Init : Singleton<Init>
 {
     [SerializeField] TMPro.TMP_Text txtStatus;
 
-    private bool isAddressableLoaded;
     private bool isOffline;
     private FirebaseAuth auth;
     private GoogleSignInConfiguration configuration;
@@ -22,9 +22,9 @@ public class Init : Singleton<Init>
     protected override void Awake()
     {
         base.Awake();
-        
+
         configuration = new GoogleSignInConfiguration { WebClientId = webClientId, RequestEmail = true, RequestIdToken = true };
-        CheckDependencies();
+        // CheckDependencies();
         StartCoroutine(IECheckInternet());
     }
 
@@ -49,16 +49,20 @@ public class Init : Singleton<Init>
             txtStatus.color = Color.green;
             txtStatus.text = "Online";
             isOffline = false;
-            StopAllCoroutines();
 
-            Invoke(nameof(TryAutoLogin), 5);
+            yield return new WaitUntil(() => AddressablesManager.instance.isDownloaded);
+
+            if (PlayerPrefs.HasKey("Email")) LoadGame();
+
+            StopAllCoroutines();
         }
     }
 
 
     private void CheckDependencies()
     {
-        FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
+        // FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
+        FirebaseApp.CheckAndFixDependenciesAsync().ContinueWith(task =>
         {
             if (task.IsCompleted)
             {
@@ -74,26 +78,20 @@ public class Init : Singleton<Init>
     {
         if (task.IsFaulted)
         {
-            using (IEnumerator<Exception> enumerator = task.Exception.InnerExceptions.GetEnumerator())
-            {
-                if (enumerator.MoveNext())
-                {
-                    GoogleSignIn.SignInException error = (GoogleSignIn.SignInException)enumerator.Current;
-                }
-            }
+
         }
         else if (task.IsCanceled)
         {
-            Debug.Log("Canceled");
+
         }
         else
         {
             string s = "Welcome: " + task.Result.DisplayName + "!";
             s += ("Email = " + task.Result.Email);
-            // s += ("Google ID Token = " + task.Result.IdToken);
+            Debug.Log("User Data: " + s);
 
-            Debug.Log("User Data : " + s);
-            SignInWithGoogleOnFirebase(task.Result.IdToken);
+            Loading.instance.LoadLevel(1, 2, 0, null);
+            // SaveUserData(task.Result);
         }
     }
 
@@ -134,13 +132,17 @@ public class Init : Singleton<Init>
         });
     }
 
-    private void SignIn()
+    private IEnumerator SignIn()
     {
         GoogleSignIn.Configuration = configuration;
         GoogleSignIn.Configuration.UseGameSignIn = false;
         GoogleSignIn.Configuration.RequestIdToken = true;
 
-        GoogleSignIn.DefaultInstance.SignIn().ContinueWith(OnAuthenticationFinished);
+        // GoogleSignIn.DefaultInstance.SignIn().ContinueWith(OnAuthenticationFinished);
+        var x = GoogleSignIn.DefaultInstance.SignIn();
+        yield return new WaitUntil(() => x.IsCompleted || x.IsCompletedSuccessfully);
+
+        SaveData(x.Result);
     }
 
     private void OnSignOut()
@@ -150,29 +152,20 @@ public class Init : Singleton<Init>
 
     private void LoadGame()
     {
+        if (PlayerPrefs.HasKey("Email")) PlayerPrefs.SetInt("LoggedIn", 1);
+        else PlayerPrefs.SetInt("LoggedIn", 0);
+
         Loading.instance.LoadLevel(1, 2, 0, null);
     }
 
-    private void SaveUserData()
+    private void SaveData(GoogleSignInUser user)
     {
-        // SaveData
+        PlayerPrefs.SetString("Email", user.Email);
+        PlayerPrefs.SetString("Token", user.IdToken);
+        PlayerPrefs.SetString("Name", user.DisplayName);
+        PlayerPrefs.SetString("Image", user.ImageUrl.ToString());
 
         LoadGame();
-    }
-
-
-    internal void TryAutoLogin()
-    {
-        if (isAddressableLoaded) return;
-
-        isAddressableLoaded = true;
-        CancelInvoke();
-
-        if (PlayerPrefs.HasKey("FBToken"))
-        {
-            // StartCoroutine(IEAutoLogin());
-            // Auto Login
-        }
     }
 
 
@@ -180,13 +173,10 @@ public class Init : Singleton<Init>
     {
         if (isOffline)
         {
-            // Msg
-            Debug.Log("============== You are offline");
             return;
         }
 
-        auth = FirebaseAuth.DefaultInstance;
-        SignIn();
+        StartCoroutine(SignIn());
     }
 
     public void ButtonGuest()
@@ -207,188 +197,4 @@ public class Init : Singleton<Init>
     {
         Application.OpenURL(url);
     }
-
-
-
-    // // [SerializeField] GameObject objEventSystem;
-    // [SerializeField] GameObject objFB;
-    // [SerializeField] GameObject objGuest;
-    // 
-
-    // private const string titleId = "98603";
-
-
-    // private void Start()
-    // {
-    //     // PlayerPrefs.DeleteAll();
-    //     if (!PlayerPrefs.HasKey("FBToken"))
-    //     {
-    //         Offline();
-    //         StartCoroutine(IECheckInternet());
-    //     }
-
-    //     if (!FB.IsInitialized) FB.Init(() => FB.ActivateApp());
-    // }
-
-
-
-    // private IEnumerator IEAutoLogin()
-    // {
-    //     UnityWebRequest request = new UnityWebRequest("http://google.com");
-    //     yield return request.SendWebRequest();
-
-    //     if (request.error != null)
-    //     {
-    //         StopAllCoroutines();
-    //         Offline();
-    //     }
-    //     else
-    //     {
-    //         Online();
-    //     }
-    // }
-
-
-    // private void DefaultScreen()
-    // {
-    //     objFB.SetActive(true);
-    //     objGuest.SetActive(true);
-    // }
-
-    // private void Online()
-    // {
-    //     txtStatus.color = Color.green;
-    //     txtStatus.text = "Online";
-    //     DefaultScreen();
-    //     if (PlayerPrefs.HasKey("FBToken")) AutoLogin();
-    //     else Loading.instance.Disable();
-    // }
-
-    // private void Offline()
-    // {
-    //     txtStatus.color = Color.red;
-    //     txtStatus.text = "Offline";
-    //     objFB.SetActive(true);
-    //     objGuest.SetActive(true);
-    //     Loading.instance.Disable();
-    //     StartCoroutine(IECheckInternet());
-    // }
-
-    // private void AutoLogin()
-    // {
-    //     objFB.SetActive(false);
-    //     objGuest.SetActive(false);
-    //     LoginWithPlayfab(PlayerPrefs.GetString("FBToken"));
-    // }
-
-    // private void LoginWithPlayfab(string token)
-    // {
-    //     Loading.instance.Active();
-    //     // Invoke(nameof(Offline), 10);
-    //     PlayFabClientAPI.LoginWithFacebook(new PlayFab.ClientModels.LoginWithFacebookRequest
-    //     {
-    //         TitleId = titleId,
-    //         AccessToken = token,
-    //         CreateAccount = true,
-    //         InfoRequestParameters = new GetPlayerCombinedInfoRequestParams
-    //         {
-    //             GetPlayerProfile = true
-    //         }
-    //     }, PlayfabLoginSucess, PlafabLoginFail);
-    // }
-
-    // private void PlayfabLoginSucess(PlayFab.ClientModels.LoginResult result)
-    // {
-    //     if (!PlayerPrefs.HasKey("FBToken") || Application.platform == RuntimePlatform.Android)
-    //     {
-    //         if (FB.IsLoggedIn)
-    //         {
-    //             PlayerPrefs.SetString("FBToken", AccessToken.CurrentAccessToken.TokenString);
-    //             UpdatePlayerData();
-    //         }
-    //         else FBLogin();
-    //     }
-
-    //     PlayerPrefs.SetString("PlayfabId", result.PlayFabId);
-    //     PlayerPrefs.SetInt("LoggedIn", 1);
-    //     LoadGame();
-    // }
-
-    // private void PlafabLoginFail(PlayFabError error)
-    // {
-    //     Offline();
-    // }
-
-    // private void UpdatePlayerData()
-    // {
-    //     FB.API("me?fields=name", Facebook.Unity.HttpMethod.GET, GetFBName);
-    //     FB.API("/me/picture?redirect=false", HttpMethod.GET, GetFBPic);
-    // }
-
-    // private void GetFBPic(IGraphResult result)
-    // {
-    //     if (string.IsNullOrEmpty(result.Error) && !result.Cancelled)
-    //     {
-    //         IDictionary data = result.ResultDictionary["data"] as IDictionary;
-    //         string url = data["url"] as string;
-
-    //         if (string.IsNullOrEmpty(url)) return;
-    //         PlayFabClientAPI.UpdateAvatarUrl(new UpdateAvatarUrlRequest()
-    //         {
-    //             ImageUrl = url
-    //         }, OnSuccess => { }, OnFailed => { });
-    //     }
-    // }
-
-    // private void GetFBName(Facebook.Unity.IGraphResult result)
-    // {
-    //     string fbName = result.ResultDictionary["name"].ToString();
-    //     fbName = ClampName(fbName);
-    //     var request = new UpdateUserTitleDisplayNameRequest
-    //     {
-    //         DisplayName = fbName,
-    //     };
-    //     PlayFabClientAPI.UpdateUserTitleDisplayName(request, OnSucessUpdatePlayerData => { PlayerPrefs.SetString("PlayerName", fbName); }, OnError);
-    // }
-
-    // private string ClampName(string name)
-    // {
-    //     if (name.Length <= 6) return name + "    ";
-    //     else if (name.Length >= 25) return name.Substring(0, 25);
-    //     return name;
-    // }
-
-    // private void FBLogin()
-    // {
-    //     var perms = new List<string>() { "email", "gaming_user_picture" };
-    //     FB.LogInWithReadPermissions(perms, OnFBLogin);
-    // }
-
-    // private void OnFBLogin(ILoginResult result)
-    // {
-    //     if (FB.IsLoggedIn)
-    //     {
-    //         PlayerPrefs.SetString("FBToken", AccessToken.CurrentAccessToken.TokenString);
-    //         UpdatePlayerData();
-    //     }
-    //     else
-    //     {
-    //         DefaultScreen();
-    //     }
-    // }
-
-    // private void OnError(PlayFabError error)
-    // {
-    //     Offline();
-    // }
-
-    // private void LoadGame()
-    // {
-    //     // objEventSystem.SetActive(false);
-    //     Loading.instance.LoadLevel(1, 2, 0, null);
-    // }
-
-
-
-
 }

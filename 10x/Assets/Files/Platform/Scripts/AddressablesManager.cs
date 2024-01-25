@@ -7,6 +7,7 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 public class AddressablesManager : PersistentSingleton<AddressablesManager>
 {
     [SerializeField] AssetReference[] references;
+    internal bool isDownloaded;
     private AsyncOperationHandle<GameObject>[] datas;
 
 
@@ -35,7 +36,7 @@ public class AddressablesManager : PersistentSingleton<AddressablesManager>
         }
 
         Loading.instance.Disable();
-        // Init.instance.TryAutoLogin();
+        isDownloaded = true;
     }
 
     // private IEnumerator IELoad(int game)
@@ -88,7 +89,7 @@ public class AddressablesManager : PersistentSingleton<AddressablesManager>
 
     internal void ButtonGame(int game)
     {
-        Loading.instance.LoadLevel(2, 3, game, Load);        
+        Loading.instance.LoadLevel(2, 3, game, Load);
     }
 }
 
